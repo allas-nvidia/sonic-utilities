@@ -2052,6 +2052,53 @@ def mgmt_ip_restart_services():
     os.system (cmd)
 
 #
+# 'tx_err_mon_threshold' subcommand
+#
+@interface.group()
+@click.pass_context
+def tx_err_mon_threshold(ctx):
+    """Tx_MON_ERR-related configuration tasks"""
+    pass
+@tx_err_mon_threshold.command()
+@click.pass_context
+@click.argument('interface_name', metavar='<interface_name>', required=True)
+@click.argument('tx_mon_threshold', metavar='<tx_mon_threshold>', required=True)
+def set(ctx, interface_name, tx_mon_threshold):
+    """Set interface tx_mon_err_threshold"""
+    # Get the config_db connector
+    config_db = ctx.obj['config_db']
+    if get_interface_naming_mode() == "alias":
+        interface_name = interface_alias_to_name(config_db, interface_name)
+        if interface_name is None:
+            ctx.fail("'interface_name' is None!")
+    if interface_name_is_valid(config_db, interface_name) is False:
+         ctx.fail("Interface name is invalid. Please enter a valid interface name!!")
+
+    if interface_name.startswith("Ethernet"):
+       config_db.set_entry('TxMON_ERR', (interface_name), {"threshold": tx_mon_threshold})
+    else:
+        ctx.fail("Only Ethernet interfaces are supported")
+
+@tx_err_mon_threshold.command()
+@click.pass_context
+@click.argument('interface_name', metavar='<interface_name>', required=True)
+def unset(ctx, interface_name):
+    """delete tx_err_mon_threshold"""
+    # Get the config_db connector
+    config_db = ctx.obj['config_db']
+    if get_interface_naming_mode() == "alias":
+        interface_name = interface_alias_to_name(config_db, interface_name)
+        if interface_name is None:
+            ctx.fail("'interface_name' is None!")
+    if interface_name_is_valid(config_db, interface_name) is False:
+         ctx.fail("Interface name is invalid. Please enter a valid interface name!!")
+
+    if interface_name.startswith("Ethernet"):
+       config_db.set_entry('TxMON_ERR', (interface_name), None)
+    else:
+        ctx.fail("Only Ethernet interfaces are supported")
+        
+#
 # 'mtu' subcommand
 #
 
@@ -2350,7 +2397,6 @@ def unbind(ctx, interface_name):
     for interface_del in interface_dependent:
         config_db.set_entry(table_name, interface_del, None)
     config_db.set_entry(table_name, interface_name, None)
-
 
 #
 # 'vrf' group ('config vrf ...')
@@ -3348,6 +3394,33 @@ def feature_autorestart(name, autorestart):
 
     for ns, cfgdb in cfgdb_clients.items():
         cfgdb.mod_entry('FEATURE', name, {'auto_restart': autorestart})
+
+
+@config.group(cls=AbbreviationGroup, name='tx_mon_err', invoke_without_command=False)
+def tx_mon_err():
+    """Tx_MON_ERR-related configuration tasks"""
+    pass
+
+@tx_mon_err.command('timer_interval', short_help="Set global period interval (seconds) for Tx Err Monitor")
+@click.argument('timer_interval', metavar='<timer_interval>', required=True)
+def set_tx_mon_err(timer_interval):
+    """Set TxMon interval"""
+    config_db = ConfigDBConnector()
+    config_db.connect()
+    click.echo("your timer interval is: {}".format(timer_interval))
+    click.echo("your timer interval type is: {}".format(type(timer_interval)))
+    if (int(timer_interval) == 0  or int(timer_interval) > 280):
+        click.echo("'timer_interval' can not not be 0. Allowed values 1-120")
+        return
+    click.echo("I am HERE")
+    config_db.set_entry("TxMON_ERR", ("timer_interval"), {"value": timer_interval})
+
+@tx_mon_err.command('disable', short_help="Disable global period interval for Tx Err Monitor")
+def disable_tx_mon_err():
+    """Disable TxMon interval"""
+    config_db = ConfigDBConnector()
+    config_db.connect()
+    config_db.set_entry('TxMON_ERR', "timer_interval", None)
 
 if __name__ == '__main__':
     config()

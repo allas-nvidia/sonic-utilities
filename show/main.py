@@ -3037,5 +3037,48 @@ def tunnel():
 
     click.echo(tabulate(table, header))
 
+#
+# 'tx_mon_err' command ("show tx_mon_err")
+#
+@cli.group(cls=AliasedGroup, default_if_no_args=False)
+def tx_mon_err():
+    """Show tx_mon_err related information"""
+    pass
+@tx_mon_err.command()
+def get_all():
+    
+    state_db = SonicV2Connector(host='127.0.0.1')
+    state_db.connect(state_db.STATE_DB, False)   # Make one attempt only
+    TABLE_NAME_SEPARATOR = '|'
+    prefix_statedb = "TXMON_ERR_RESTORE_TABLE|"
+    _hash = '{}{}'.format(prefix_statedb, '*')
+    txmon_state_keys = state_db.keys(state_db.STATE_DB, _hash)
+    appl_db = SonicV2Connector(host='127.0.0.1')
+    appl_db.connect(appl_db.APPL_DB, False)
+    prefix_appldb = "TXMON_ERR_TABLE:"
+    _hash = '{}{}'.format(prefix_statedb, "*")
+    txmon_appl_keys = appl_db.keys(appl_db.APPL_DB, _hash)
+    table = []
+    if txmon_state_keys:
+        for k in txmon_state_keys:
+            k = k.replace(prefix_statedb, "")
+            r = []
+            r.append(k)
+            r.append(state_db.get(state_db.STATE_DB, prefix_statedb + k, "state"))
+            entry = appl_db.get_all(appl_db.APPL_DB, prefix_appldb + k)
+            if not entry or 'counter' not in entry:
+                r.append("")
+            else:
+                r.append(entry['counter'])
+            if not entry or 'threshold' not in entry:
+                r.append("")
+            else:
+                r.append(entry['threshold'])
+            table.append(r)
+    header = ['Port', 'status', 'statistics','threshold']
+    click.echo(tabulate(table, header))    
+            
+                
+            
 if __name__ == '__main__':
     cli()
