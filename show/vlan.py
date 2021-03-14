@@ -110,32 +110,29 @@ def config(db):
     keys = list(data.keys())
     member_data = db.cfgdb.get_table('VLAN_MEMBER')
 
+    def member_name(member):
+        alias = member
+        if clicommon.get_interface_naming_mode() == "alias" and member:
+            alias = clicommon.InterfaceAliasConverter(db).name_to_alias(member)
+        return alias
+    
+    def member_tagging(vlan, member):
+        if not member:
+            return ''
+        mode = db.cfgdb.get_entry('VLAN_MEMBER', (vlan, member)).get('tagging_mode')
+        return '?' if mode is None else mode
+        
     def tablelize(keys, data):
         table = []
 
         for k in natsorted(keys):
-            members = set(data[k].get('members', []))
-            for (vlan, interface_name) in member_data:
-                if vlan == k:
-                    members.add(interface_name)
-
-            for m in natsorted(list(members)):
-                r = []
-                r.append(k)
-                r.append(data[k]['vlanid'])
-                if clicommon.get_interface_naming_mode() == "alias":
-                    alias = clicommon.InterfaceAliasConverter(db).name_to_alias(m)
-                    r.append(alias)
-                else:
-                    r.append(m)
-
-                entry = db.cfgdb.get_entry('VLAN_MEMBER', (k, m))
-                mode = entry.get('tagging_mode')
-                if mode is None:
-                    r.append('?')
-                else:
-                    r.append(mode)
-
+            members = set([(vlan, member) for vlan, member in member_data if vlan == k]+[(k, member) for member in set(data[k].get('members', []))])
+            #vlan with no members
+            if not members:
+                members = [(k, '')]
+            
+            for vlan, member in members:
+                r = [vlan, data[vlan]['vlanid'], member_name(member), member_tagging(vlan,member)]
                 table.append(r)
 
         return table
